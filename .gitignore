@@ -1,2 +1,7 @@
 nppBackup
+.vscode
+*.bat
 
+*.o
+*.exe
+*.lst
