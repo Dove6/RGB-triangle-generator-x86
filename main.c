@@ -76,6 +76,60 @@ void set_vertex(struct VERTEXDATA *vertex, DWORD pos_x, DWORD pos_y, DWORD hex_c
     }
 }
 
+void swap_vertices(struct VERTEXDATA *a, struct VERTEXDATA *b)
+{
+    if (a != NULL && b != NULL) {
+        struct VERTEXDATA tmp;
+        memcpy(&tmp, a, sizeof(struct VERTEXDATA));
+        memcpy(a, b, sizeof(struct VERTEXDATA));
+        memcpy(b, &tmp, sizeof(struct VERTEXDATA));
+    }
+}
+
+void sort_vertices(struct VERTEXDATA (*vertex_data)[3])
+{
+    if (vertex_data != NULL) {
+        if ((*vertex_data)[1].posY < (*vertex_data)[0].posY) {
+            swap_vertices(&(*vertex_data)[0], &(*vertex_data)[1]);
+        }
+        if ((*vertex_data)[2].posY < (*vertex_data)[1].posY) {
+            swap_vertices(&(*vertex_data)[1], &(*vertex_data)[2]);
+        }
+        if ((*vertex_data)[1].posY < (*vertex_data)[0].posY) {
+            swap_vertices(&(*vertex_data)[0], &(*vertex_data)[1]);
+        }
+    }
+}
+
+void draw_triangle(BYTE *image_data, struct BITMAPINFOHEADER *info_header, struct VERTEXDATA (*vertex_data)[3])
+{
+    if (image_data != NULL && info_header != NULL && vertex_data != NULL) {
+        float delta[3] = {0, 0, 0};
+        if ((*vertex_data)[0].posY != (*vertex_data)[1].posY) {
+            delta[0] = ((*vertex_data)[0].posX - (*vertex_data)[1].posX) / (float)((*vertex_data)[0].posY - (*vertex_data)[1].posY);
+        }
+        if ((*vertex_data)[0].posY != (*vertex_data)[2].posY) {
+            delta[1] = ((*vertex_data)[0].posX - (*vertex_data)[2].posX) / (float)((*vertex_data)[0].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[1].posY != (*vertex_data)[2].posY) {
+            delta[2] = ((*vertex_data)[1].posX - (*vertex_data)[2].posX) / (float)((*vertex_data)[1].posY - (*vertex_data)[2].posY);
+        }
+
+        for (DWORD i = (*vertex_data)[0].posY; i <= (*vertex_data)[1].posY; i++) {
+
+            for (DWORD j = 0; j < abs(info_header->biWidth); j++) {
+                ;
+            }
+        }
+        for (DWORD i = (*vertex_data)[1].posY; i <= (*vertex_data)[2].posY; i++) {
+
+            for (DWORD j = 0; j < abs(info_header->biWidth); j++) {
+                ;
+            }
+        }
+    }
+}
+
 int main(void)
 {
     //user-defined variables
@@ -95,6 +149,9 @@ int main(void)
     set_file_header(&file_header, image_data_size + summed_header_size, summed_header_size);
     image_data = malloc(image_data_size * sizeof(BYTE));
 
+    //set background
+    memset(image_data, -1, image_data_size);
+
     //getting the needed input
     /* currently hard-coded */
     struct VERTEXDATA vertex_data[3];
@@ -102,8 +159,10 @@ int main(void)
     set_vertex(vertex_data, 12, 250, 0x00ff00);
     set_vertex(vertex_data, 245, 235, 0x0000ff);
 
+    sort_vertices(&vertex_data);
+
     //drawing the triangle(s)
-    /* todo */
+    draw_triangle(image_data, &info_header, &vertex_data);
 
     //writing the file
     FILE *output_file = fopen(output_filename, "wb");
