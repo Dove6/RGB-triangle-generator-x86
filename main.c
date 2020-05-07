@@ -33,6 +33,13 @@ struct RGBQUAD {
     BYTE rgbReserved;
 };
 
+struct RGBFLOATQUAD {
+    float rgbBlue;
+    float rgbGreen;
+    float rgbRed;
+    float rgbReserved;
+};
+
 struct VERTEXDATA {
     DWORD posX;
     DWORD posY;
@@ -114,35 +121,103 @@ void draw_triangle(BYTE *image_data, struct BITMAPINFOHEADER *info_header, struc
         if ((*vertex_data)[1].posY != (*vertex_data)[2].posY) {
             delta[2] = ((float)(*vertex_data)[1].posX - (*vertex_data)[2].posX) / ((float)(*vertex_data)[1].posY - (*vertex_data)[2].posY);
         }
+        struct RGBFLOATQUAD color_delta[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+        if ((*vertex_data)[0].color.rgbRed != (*vertex_data)[1].color.rgbRed) {
+            color_delta[0].rgbRed = ((float)(*vertex_data)[0].color.rgbRed - (*vertex_data)[1].color.rgbRed) / ((float)(*vertex_data)[0].posY - (*vertex_data)[1].posY);
+        }
+        if ((*vertex_data)[0].color.rgbGreen != (*vertex_data)[1].color.rgbGreen) {
+            color_delta[0].rgbGreen = ((float)(*vertex_data)[0].color.rgbGreen - (*vertex_data)[1].color.rgbGreen) / ((float)(*vertex_data)[0].posY - (*vertex_data)[1].posY);
+        }
+        if ((*vertex_data)[0].color.rgbBlue != (*vertex_data)[1].color.rgbBlue) {
+            color_delta[0].rgbBlue = ((float)(*vertex_data)[0].color.rgbBlue - (*vertex_data)[1].color.rgbBlue) / ((float)(*vertex_data)[0].posY - (*vertex_data)[1].posY);
+        }
+        if ((*vertex_data)[0].color.rgbRed != (*vertex_data)[2].color.rgbRed) {
+            color_delta[1].rgbRed = ((float)(*vertex_data)[0].color.rgbRed - (*vertex_data)[2].color.rgbRed) / ((float)(*vertex_data)[0].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[0].color.rgbGreen != (*vertex_data)[2].color.rgbGreen) {
+            color_delta[1].rgbGreen = ((float)(*vertex_data)[0].color.rgbGreen - (*vertex_data)[2].color.rgbGreen) / ((float)(*vertex_data)[0].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[0].color.rgbBlue != (*vertex_data)[2].color.rgbBlue) {
+            color_delta[1].rgbBlue = ((float)(*vertex_data)[0].color.rgbBlue - (*vertex_data)[2].color.rgbBlue) / ((float)(*vertex_data)[0].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[1].color.rgbRed != (*vertex_data)[2].color.rgbRed) {
+            color_delta[2].rgbRed = ((float)(*vertex_data)[1].color.rgbRed - (*vertex_data)[2].color.rgbRed) / ((float)(*vertex_data)[1].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[1].color.rgbGreen != (*vertex_data)[2].color.rgbGreen) {
+            color_delta[2].rgbGreen = ((float)(*vertex_data)[1].color.rgbGreen - (*vertex_data)[2].color.rgbGreen) / ((float)(*vertex_data)[1].posY - (*vertex_data)[2].posY);
+        }
+        if ((*vertex_data)[1].color.rgbBlue != (*vertex_data)[2].color.rgbBlue) {
+            color_delta[2].rgbBlue = ((float)(*vertex_data)[1].color.rgbBlue - (*vertex_data)[2].color.rgbBlue) / ((float)(*vertex_data)[1].posY - (*vertex_data)[2].posY);
+        }
 
         DWORD aligned_width = (abs(info_header->biWidth) + 3) & 0xfffffffc;
 
         for (DWORD i = (*vertex_data)[0].posY; i <= (*vertex_data)[1].posY; i++) {
             DWORD left = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[0]);
             DWORD right = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[1]);
+            struct RGBQUAD left_color, right_color;
+            left_color.rgbRed = round((*vertex_data)[0].color.rgbRed + (i - (*vertex_data)[0].posY) * color_delta[0].rgbRed);
+            left_color.rgbGreen = round((*vertex_data)[0].color.rgbGreen + (i - (*vertex_data)[0].posY) * color_delta[0].rgbGreen);
+            left_color.rgbBlue = round((*vertex_data)[0].color.rgbBlue + (i - (*vertex_data)[0].posY) * color_delta[0].rgbBlue);
+            right_color.rgbRed = round((*vertex_data)[0].color.rgbRed + (i - (*vertex_data)[0].posY) * color_delta[1].rgbRed);
+            right_color.rgbGreen = round((*vertex_data)[0].color.rgbGreen + (i - (*vertex_data)[0].posY) * color_delta[1].rgbGreen);
+            right_color.rgbBlue = round((*vertex_data)[0].color.rgbBlue + (i - (*vertex_data)[0].posY) * color_delta[1].rgbBlue);
             if (left > right) {
                 DWORD tmp = left;
                 left = right;
                 right = tmp;
+                struct RGBQUAD tmp_color = left_color;
+                left_color = right_color;
+                right_color = tmp_color;
+            }
+            struct RGBFLOATQUAD line_color_delta = {0, 0, 0};
+            if (left_color.rgbRed != right_color.rgbRed) {
+                line_color_delta.rgbRed = ((float)left_color.rgbRed - right_color.rgbRed) / ((float)left - right);
+            }
+            if (left_color.rgbGreen != right_color.rgbGreen) {
+                line_color_delta.rgbGreen = ((float)left_color.rgbGreen - right_color.rgbGreen) / ((float)left - right);
+            }
+            if (left_color.rgbBlue != right_color.rgbBlue) {
+                line_color_delta.rgbBlue = ((float)left_color.rgbBlue - right_color.rgbBlue) / ((float)left - right);
             }
             for (DWORD j = left; j <= right; j++) {
-                (image_data + (i * aligned_width + j) * 3)[0] = 0;
-                (image_data + (i * aligned_width + j) * 3)[1] = 0;
-                (image_data + (i * aligned_width + j) * 3)[2] = 0;
+                (image_data + (i * aligned_width + j) * 3)[0] = left_color.rgbBlue + (j - left) * line_color_delta.rgbBlue;
+                (image_data + (i * aligned_width + j) * 3)[1] = left_color.rgbGreen + (j - left) * line_color_delta.rgbGreen;
+                (image_data + (i * aligned_width + j) * 3)[2] = left_color.rgbRed + (j - left) * line_color_delta.rgbRed;
             }
         }
         for (DWORD i = (*vertex_data)[1].posY; i <= (*vertex_data)[2].posY; i++) {
             DWORD left = round((*vertex_data)[1].posX + (i - (*vertex_data)[1].posY) * delta[2]);
             DWORD right = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[1]);
+            struct RGBQUAD left_color, right_color;
+            left_color.rgbRed = round((*vertex_data)[1].color.rgbRed + (i - (*vertex_data)[1].posY) * color_delta[2].rgbRed);
+            left_color.rgbGreen = round((*vertex_data)[1].color.rgbGreen + (i - (*vertex_data)[1].posY) * color_delta[2].rgbGreen);
+            left_color.rgbBlue = round((*vertex_data)[1].color.rgbBlue + (i - (*vertex_data)[1].posY) * color_delta[2].rgbBlue);
+            right_color.rgbRed = round((*vertex_data)[0].color.rgbRed + (i - (*vertex_data)[0].posY) * color_delta[1].rgbRed);
+            right_color.rgbGreen = round((*vertex_data)[0].color.rgbGreen + (i - (*vertex_data)[0].posY) * color_delta[1].rgbGreen);
+            right_color.rgbBlue = round((*vertex_data)[0].color.rgbBlue + (i - (*vertex_data)[0].posY) * color_delta[1].rgbBlue);
             if (left > right) {
                 DWORD tmp = left;
                 left = right;
                 right = tmp;
+                struct RGBQUAD tmp_color = left_color;
+                left_color = right_color;
+                right_color = tmp_color;
+            }
+            struct RGBFLOATQUAD line_color_delta = {0, 0, 0};
+            if (left_color.rgbRed != right_color.rgbRed) {
+                line_color_delta.rgbRed = ((float)left_color.rgbRed - right_color.rgbRed) / ((float)left - right);
+            }
+            if (left_color.rgbGreen != right_color.rgbGreen) {
+                line_color_delta.rgbGreen = ((float)left_color.rgbGreen - right_color.rgbGreen) / ((float)left - right);
+            }
+            if (left_color.rgbBlue != right_color.rgbBlue) {
+                line_color_delta.rgbBlue = ((float)left_color.rgbBlue - right_color.rgbBlue) / ((float)left - right);
             }
             for (DWORD j = left; j <= right; j++) {
-                (image_data + (i * aligned_width + j) * 3)[0] = 0;
-                (image_data + (i * aligned_width + j) * 3)[1] = 0;
-                (image_data + (i * aligned_width + j) * 3)[2] = 0;
+                (image_data + (i * aligned_width + j) * 3)[0] = left_color.rgbBlue + (j - left) * line_color_delta.rgbBlue;
+                (image_data + (i * aligned_width + j) * 3)[1] = left_color.rgbGreen + (j - left) * line_color_delta.rgbGreen;
+                (image_data + (i * aligned_width + j) * 3)[2] = left_color.rgbRed + (j - left) * line_color_delta.rgbRed;
             }
         }
     }
