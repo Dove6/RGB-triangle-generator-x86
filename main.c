@@ -106,25 +106,43 @@ void draw_triangle(BYTE *image_data, struct BITMAPINFOHEADER *info_header, struc
     if (image_data != NULL && info_header != NULL && vertex_data != NULL) {
         float delta[3] = {0, 0, 0};
         if ((*vertex_data)[0].posY != (*vertex_data)[1].posY) {
-            delta[0] = ((*vertex_data)[0].posX - (*vertex_data)[1].posX) / (float)((*vertex_data)[0].posY - (*vertex_data)[1].posY);
+            delta[0] = ((float)(*vertex_data)[0].posX - (*vertex_data)[1].posX) / ((float)(*vertex_data)[0].posY - (*vertex_data)[1].posY);
         }
         if ((*vertex_data)[0].posY != (*vertex_data)[2].posY) {
-            delta[1] = ((*vertex_data)[0].posX - (*vertex_data)[2].posX) / (float)((*vertex_data)[0].posY - (*vertex_data)[2].posY);
+            delta[1] = ((float)(*vertex_data)[0].posX - (*vertex_data)[2].posX) / ((float)(*vertex_data)[0].posY - (*vertex_data)[2].posY);
         }
         if ((*vertex_data)[1].posY != (*vertex_data)[2].posY) {
-            delta[2] = ((*vertex_data)[1].posX - (*vertex_data)[2].posX) / (float)((*vertex_data)[1].posY - (*vertex_data)[2].posY);
+            delta[2] = ((float)(*vertex_data)[1].posX - (*vertex_data)[2].posX) / ((float)(*vertex_data)[1].posY - (*vertex_data)[2].posY);
         }
 
-        for (DWORD i = (*vertex_data)[0].posY; i <= (*vertex_data)[1].posY; i++) {
+        DWORD aligned_width = (abs(info_header->biWidth) + 3) & 0xfffffffc;
 
-            for (DWORD j = 0; j < abs(info_header->biWidth); j++) {
-                ;
+        for (DWORD i = (*vertex_data)[0].posY; i <= (*vertex_data)[1].posY; i++) {
+            DWORD left = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[0]);
+            DWORD right = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[1]);
+            if (left > right) {
+                DWORD tmp = left;
+                left = right;
+                right = tmp;
+            }
+            for (DWORD j = left; j <= right; j++) {
+                (image_data + (i * aligned_width + j) * 3)[0] = 0;
+                (image_data + (i * aligned_width + j) * 3)[1] = 0;
+                (image_data + (i * aligned_width + j) * 3)[2] = 0;
             }
         }
         for (DWORD i = (*vertex_data)[1].posY; i <= (*vertex_data)[2].posY; i++) {
-
-            for (DWORD j = 0; j < abs(info_header->biWidth); j++) {
-                ;
+            DWORD left = round((*vertex_data)[1].posX + (i - (*vertex_data)[1].posY) * delta[2]);
+            DWORD right = round((*vertex_data)[0].posX + (i - (*vertex_data)[0].posY) * delta[1]);
+            if (left > right) {
+                DWORD tmp = left;
+                left = right;
+                right = tmp;
+            }
+            for (DWORD j = left; j <= right; j++) {
+                (image_data + (i * aligned_width + j) * 3)[0] = 0;
+                (image_data + (i * aligned_width + j) * 3)[1] = 0;
+                (image_data + (i * aligned_width + j) * 3)[2] = 0;
             }
         }
     }
@@ -155,9 +173,9 @@ int main(void)
     //getting the needed input
     /* currently hard-coded */
     struct VERTEXDATA vertex_data[3];
-    set_vertex(vertex_data, 128, 10, 0xff0000);
-    set_vertex(vertex_data, 12, 250, 0x00ff00);
-    set_vertex(vertex_data, 245, 235, 0x0000ff);
+    set_vertex(&vertex_data[0], 128, 10, 0xff0000);
+    set_vertex(&vertex_data[1], 12, 250, 0x00ff00);
+    set_vertex(&vertex_data[2], 245, 235, 0x0000ff);
 
     sort_vertices(&vertex_data);
 
@@ -170,6 +188,9 @@ int main(void)
     fwrite(&info_header, 1, sizeof(info_header), output_file);
     fwrite(image_data, 1, image_data_size, output_file);
     fclose(output_file);
+
+    //deallocate bitmap data
+    free(image_data);
 
     return 0;
 }
