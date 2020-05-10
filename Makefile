@@ -16,7 +16,7 @@ endif
 
 all : asm cc link
 asm : 
-	$(ASMBIN) -o rgb_triangle.o -f $(FORMAT) $(ASMFLAGS) -l rgb_triangle.lst rgb_triangle.asm
+	$(ASMBIN) -o rgb_triangle.o -f $(FORMAT) $(ASMFLAGS) -g -l rgb_triangle.lst rgb_triangle.asm
 cc :
 	$(CC) -m32 -c -g -O0 -Wall $(DEFINES) main.c
 link :

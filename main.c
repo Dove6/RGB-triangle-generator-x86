@@ -121,87 +121,7 @@ void sort_vertices(struct VERTEXDATA (*vertex_data)[3])
     }
 }
 
-void draw_triangle(BYTE *image_data, struct BITMAPINFOHEADER *info_header, struct VERTEXDATA (*vertices)[3])
-{
-    if (image_data != NULL && info_header != NULL && vertices != NULL) {
-        struct VERTEXSTEP {
-            float x, r, g, b;
-        } step[3] = {{}, {}, {}};
-        if ((*vertices)[0].posY != (*vertices)[1].posY) {
-            float difference = (*vertices)[0].posY - (*vertices)[1].posY;
-            step[0].x = ((*vertices)[0].posX - (*vertices)[1].posX) / difference;
-            step[0].r = ((*vertices)[0].colR - (*vertices)[1].colR) / difference;
-            step[0].g = ((*vertices)[0].colG - (*vertices)[1].colG) / difference;
-            step[0].b = ((*vertices)[0].colB - (*vertices)[1].colB) / difference;
-        }
-        if ((*vertices)[0].posY != (*vertices)[2].posY) {
-            float difference = (*vertices)[0].posY - (*vertices)[2].posY;
-            step[1].x = ((*vertices)[0].posX - (*vertices)[2].posX) / difference;
-            step[1].r = ((*vertices)[0].colR - (*vertices)[2].colR) / difference;
-            step[1].g = ((*vertices)[0].colG - (*vertices)[2].colG) / difference;
-            step[1].b = ((*vertices)[0].colB - (*vertices)[2].colB) / difference;
-        }
-        if ((*vertices)[1].posY != (*vertices)[2].posY) {
-            float difference = (*vertices)[1].posY - (*vertices)[2].posY;
-            step[2].x = ((*vertices)[1].posX - (*vertices)[2].posX) / difference;
-            step[2].r = ((*vertices)[1].colR - (*vertices)[2].colR) / difference;
-            step[2].g = ((*vertices)[1].colG - (*vertices)[2].colG) / difference;
-            step[2].b = ((*vertices)[1].colB - (*vertices)[2].colB) / difference;
-        }
-
-        size_t stride = (abs(info_header->biWidth) * 3 + 3) & 0xfffffffc;
-        LONG min_y = (*vertices)[0].posY, max_y = (*vertices)[2].posY;
-        if (min_y < 0) {
-            min_y = 0;
-        }
-        if (max_y >= abs(info_header->biHeight)) {
-            max_y = abs(info_header->biHeight) - 1;
-        }
-
-        for (LONG i = min_y; i <= max_y; i++) {
-            struct VERTEXDATA left = {}, right = {};
-            if (i <= (*vertices)[1].posY) {
-                left.posX = round((*vertices)[0].posX + (i - (*vertices)[0].posY) * step[0].x);
-                left.colR = round((*vertices)[0].colR + (i - (*vertices)[0].posY) * step[0].r);
-                left.colG = round((*vertices)[0].colG + (i - (*vertices)[0].posY) * step[0].g);
-                left.colB = round((*vertices)[0].colB + (i - (*vertices)[0].posY) * step[0].b);
-            } else {
-                left.posX = round((*vertices)[1].posX + (i - (*vertices)[1].posY) * step[2].x);
-                left.colR = round((*vertices)[1].colR + (i - (*vertices)[1].posY) * step[2].r);
-                left.colG = round((*vertices)[1].colG + (i - (*vertices)[1].posY) * step[2].g);
-                left.colB = round((*vertices)[1].colB + (i - (*vertices)[1].posY) * step[2].b);
-            }
-            right.posX = round((*vertices)[0].posX + (i - (*vertices)[0].posY) * step[1].x);
-            right.colR = round((*vertices)[0].colR + (i - (*vertices)[0].posY) * step[1].r);
-            right.colG = round((*vertices)[0].colG + (i - (*vertices)[0].posY) * step[1].g);
-            right.colB = round((*vertices)[0].colB + (i - (*vertices)[0].posY) * step[1].b);
-            if (left.posX > right.posX) {
-                swap_vertices(&left, &right);
-            }
-            struct COLORSTEP {
-                float r, g, b;
-            } line_color_step = {};
-            if (left.posX != right.posX) {
-                float difference = left.posX - right.posX;
-                line_color_step.r = ((SHORT)left.colR - right.colR) / difference;
-                line_color_step.g = ((SHORT)left.colG - right.colG) / difference;
-                line_color_step.b = ((SHORT)left.colB - right.colB) / difference;
-            }
-            if (left.posX < 0) {
-                left.posX = 0;
-            }
-            if (right.posX >= abs(info_header->biWidth)) {
-                right.posX = abs(info_header->biWidth) - 1;
-            }
-            for (LONG j = left.posX; j <= right.posX; j++) {
-                BYTE *pixel_address = image_data + i * stride + j * 3;
-                pixel_address[0] = left.colB + (j - left.posX) * line_color_step.b;
-                pixel_address[1] = left.colG + (j - left.posX) * line_color_step.g;
-                pixel_address[2] = left.colR + (j - left.posX) * line_color_step.r;
-            }
-        }
-    }
-}
+extern int draw_triangle(BYTE *image_data, struct BITMAPINFOHEADER *info_header, struct VERTEXDATA (*vertices)[3]);
 
 void print_help(void)
 {
@@ -229,8 +149,8 @@ int main(int argc, char **argv)
     //settings
     LONG image_width = 256,
         image_height = 256;
-    char output_filename[260];
-    strncpy(output_filename, "result.bmp", 260);
+    char output_filename[260] = {0};
+    strcpy(output_filename, "result.bmp");
     
     //data-related variables created based on user-defined values
     BYTE file_header[14];
@@ -247,7 +167,8 @@ int main(int argc, char **argv)
             image_height = atoi(argv[3]);
         }
         case 2: {
-            strncpy(output_filename, argv[1], 260);
+            output_filename[0] = 0;
+            strncat(output_filename, argv[1], 259);
             break;
         }
         default: {
