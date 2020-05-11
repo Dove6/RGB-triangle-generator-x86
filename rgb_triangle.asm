@@ -73,9 +73,6 @@ draw_triangle: ; BYTE *image_data, struct BITMAPINFOHEADER *info_header, struct 
 	call memset ; memset(esp, 0, 0x9c)
 	add esp, 12
 
-	lea eax, [image_data]
-	mov [row_address], eax
-
 calc_step0:
 	mov eax, [ebx+4] ; *vertices + 0 * 12 + 4 (posY)
 	mov [min_y], eax ; save *vertices[0].posY as min_y
@@ -156,7 +153,7 @@ calc_step1:
 
 calc_step2:
 	mov eax, [ebx+12+4] ; *vertices + 1 * 12 + 4 (posY)
-	sub eax, [ebx+2+12+4] ; *vertices + 2 * 12 + 4 (posY)
+	sub eax, [ebx+2*12+4] ; *vertices + 2 * 12 + 4 (posY)
 	jz calc_minmax_y
 	push eax         ;
 	fild dword [esp] ; load position difference to FPU
@@ -345,11 +342,14 @@ draw_triangle_y_pre_loop:
 
 	fstp st0
 	add esp, 8
+	; calculate row address
+	mov eax, [stride]
+	mul dword [min_y]
+	add eax, [image_data]
+	mov [row_address], eax
 draw_triangle_y_loop:
 	cmp ecx, [max_y]
 	jg draw_triangle_y_loop_end
-	mov eax, [row_address]
-	mov [pixel_address], eax
 	sub esp, 4
 	lea edi, [int_left]
 	lea edx, [int_right]
@@ -416,7 +416,10 @@ draw_triangle_x_pre_loop:
 	add esp, 4
 	fincstp
 	fincstp
-	mov ebx, [pixel_address]
+	mov ebx, ecx ;
+	shl ebx, 1   ;
+	add ebx, ecx ; multiply min_x by 3
+	add ebx, [row_address]
 draw_triangle_x_loop:
 	cmp ecx, [edx]
 	jg draw_triangle_x_loop_end
@@ -443,6 +446,8 @@ draw_triangle_x_loop:
 	inc ecx
 	jmp draw_triangle_x_loop
 draw_triangle_x_loop_end:
+	fdecstp
+	fdecstp
 	fstp st0
 	fstp st0
 	fstp st0
@@ -450,9 +455,47 @@ draw_triangle_x_loop_end:
 	pop ecx ; get back the vertical loop counter
 	inc ecx
 	mov eax, [row_address]
-	mov ebx, [stride]
-	add eax, ebx
+	add eax, [stride]
 	mov [row_address], eax
+	; update left and right
+	fld dword [left]
+	mov eax, [esi+12+4] ; (*vertices)[1].posY
+	lea ebx, [step+32]
+	cmp ecx, eax
+	lea eax, [step]
+	cmovg eax, ebx
+	fadd dword [eax] ; step x
+	fst dword [left]       ;
+	fistp dword [int_left] ; save left.x
+	fld dword [left+4]
+	fadd dword [eax+4] ; step r
+	fst dword [left+4]       ;
+	fistp dword [int_left+4] ; save left.r
+	fld dword [left+8]
+	fadd dword [eax+8] ; step g
+	fst dword [left+8]       ;
+	fistp dword [int_left+8] ; save left.g
+	fld dword [left+12]
+	fadd dword [eax+12] ; step b
+	fst dword [left+12]       ;
+	fistp dword [int_left+12] ; save left.b
+	fld dword [right]
+	fadd dword [step+16] ; step[1].x
+	fst dword [right]       ;
+	fistp dword [int_right] ; save right.x
+	fld dword [right+4]
+	fadd dword [step+16+4] ; step[1].r
+	fst dword [right+4]       ;
+	fistp dword [int_right+4] ; save right.r
+	fld dword [right+8]
+	fadd dword [step+16+8] ; step[1].g
+	fst dword [right+8]       ;
+	fistp dword [int_right+8] ; save right.g
+	fld dword [right+12]
+	fadd dword [step+16+12] ; step[1].g
+	fst dword [right+12]       ;
+	fistp dword [int_right+12] ; save right.g
+
 	jmp draw_triangle_y_loop
 draw_triangle_y_loop_end:
 
