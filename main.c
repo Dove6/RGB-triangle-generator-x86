@@ -257,6 +257,10 @@ int main(int argc, char **argv)
         } else if (strcmp(comparison_buffer, "clear") == 0) {
             struct RGBQUAD clear_color;
             if (input_length == 5) {
+                clear_color.rgbRed = 255;
+                clear_color.rgbGreen = 255;
+                clear_color.rgbBlue = 255;
+            } else {
                 bool status_ok = false;
                 int values_read = sscanf(buffer, "clear #%2hhx%2hhx%2hhx",
                     &clear_color.rgbRed, &clear_color.rgbGreen, &clear_color.rgbBlue);
@@ -286,10 +290,6 @@ int main(int argc, char **argv)
                     clear_color.rgbGreen = 255;
                     clear_color.rgbBlue = 255;
                 }
-            } else {
-                clear_color.rgbRed = 255;
-                clear_color.rgbGreen = 255;
-                clear_color.rgbBlue = 255;
             }
             clear_bitmap(image_data, &info_header, clear_color.rgbRed, clear_color.rgbGreen, clear_color.rgbBlue);
         } else if (strcmp(comparison_buffer, "save") == 0) {
