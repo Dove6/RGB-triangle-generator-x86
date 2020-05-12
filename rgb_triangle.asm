@@ -351,18 +351,18 @@ draw_triangle_y_loop:
 	cmp ecx, [max_y]
 	jg draw_triangle_y_loop_end
 	sub esp, 4
-	lea edi, [int_left]
-	lea edx, [int_right]
-	mov eax, [edi] ; left.x (int)
-	mov ebx, [edx] ; right.x (int)
+	lea edi, [left]
+	lea edx, [right]
+	mov eax, [int_left] ; left.x (int)
+	mov ebx, [int_right] ; right.x (int)
 	cmp eax, ebx
 	jz draw_triangle_x_pre_loop
 	; "exchange" if left.x > right.x
 	cmovg eax, edi
 	cmovg edi, edx
 	cmovg edx, eax
-	cmovg eax, [edi]
-	cmovg ebx, [edx]
+	cmovg eax, [int_right]
+	cmovg ebx, [int_left]
 	
 	sub eax, ebx
 	mov [esp], eax
@@ -386,12 +386,12 @@ draw_triangle_y_loop:
 	add esp, 4
 
 draw_triangle_x_pre_loop:
-	mov eax, [edi] ; left-most X
+	mov eax, [edi-0x20] ; left-most X (int)
 	xor ebx, ebx
 	cmp eax, ebx
 	cmovl eax, ebx
 	mov [min_x], eax
-	mov eax, [edx] ; right-most X
+	mov eax, [edx-0x20] ; right-most X (int)
 	mov ebx, [abs_width]
 	dec ebx
 	cmp eax, ebx
@@ -400,36 +400,34 @@ draw_triangle_x_pre_loop:
 	push ecx
 	mov ecx, [min_x]
 	mov eax, ecx
-	mov ebx, [edi]
+	mov ebx, [edi-0x20] ; (int)
 	sub eax, ebx
 	push eax
 	fild dword [esp]
 	fld dword [line_color_step]
 	fmul st1
-	fiadd dword [edi]
+	fiadd dword [edi-0x20+4] ; left r (int)
 	fld dword [line_color_step+4]
 	fmul st2
-	fiadd dword [edi+4]
+	fiadd dword [edi-0x20+8] ; left g (int)
 	fld dword [line_color_step+8]
 	fmul st3
-	fiadd dword [edi+8]
+	fiadd dword [edi-0x20+12] ; left b (int)
 	add esp, 4
-	fincstp
-	fincstp
 	mov ebx, ecx ;
 	shl ebx, 1   ;
 	add ebx, ecx ; multiply min_x by 3
 	add ebx, [row_address]
 draw_triangle_x_loop:
-	cmp ecx, [edx]
+	cmp ecx, [max_x] ; make float address from int address
 	jg draw_triangle_x_loop_end
 	sub esp, 4
 	fist dword [esp]
-	fdecstp
+	fincstp
 	mov eax, [esp]
 	mov [ebx], al ; save blue
 	fist dword [esp]
-	fdecstp
+	fincstp
 	mov eax, [esp]
 	mov [ebx+1], al ; save green
 	fist dword [esp]
@@ -437,17 +435,15 @@ draw_triangle_x_loop:
 	mov [ebx+2], al ; save red
 	; calc next colors
 	fadd dword [line_color_step] ; red
-	fincstp
+	fdecstp
 	fadd dword [line_color_step+4] ; green
-	fincstp
+	fdecstp
 	fadd dword [line_color_step+8] ; blue
 	add esp, 4
 	add ebx, 3
 	inc ecx
 	jmp draw_triangle_x_loop
 draw_triangle_x_loop_end:
-	fdecstp
-	fdecstp
 	fstp st0
 	fstp st0
 	fstp st0
