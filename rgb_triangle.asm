@@ -233,8 +233,8 @@ draw_triangle_y_pre_loop:
 	mov edx, ebx
 	add ebx, 32 ; step[2]
 	cmp ecx, [edi+4] ; *vertices + 1 * 12 + 4 (posY)
-	cmovle edi, esi ; reset to (*vertices)[0]
-	cmovle ebx, edx ; reset to step[0]
+	cmovl edi, esi ; reset to (*vertices)[0]
+	cmovl ebx, edx ; reset to step[0]
 	; zero eax, edx
 	; ebx - appropriate step
 	; edi - appropriate vertex
