@@ -504,44 +504,58 @@ draw_triangle_x_before_loop:
 	fimul dword [esp]
 	fiadd dword [edi+0x1c]  ; left-most int_b
 	; calculate memory address of the first pixel in a row
-	mov ebx, ecx  ;
-	shl ebx, 1    ;
-	add ebx, ecx  ; multiply min_x by 3
-	add ebx, [row_address]
+	mov edi, ecx  ;
+	shl edi, 1    ;
+	add edi, ecx  ; multiply min_x by 3
+	add edi, [row_address]
+	mov ebx, [max_x]
 draw_triangle_x_loop:
 	; horizontal loop for x (ecx) in range <min_x; max_x>
 	; fetch and store blue
 	fist dword [esp]
 	fincstp
 	mov eax, [esp]
-	mov [ebx], al
+	mov edx, 255    ;
+	cmp eax, edx    ;
+	cmovg eax, edx  ;
+	xor edx, edx    ;
+	test eax, eax   ;
+	cmovs eax, edx  ; clamp to <0; 255>
+	mov [edi], al
 	; fetch and store green
 	fist dword [esp]
 	fincstp
 	mov eax, [esp]
-	mov [ebx+1], al
+	mov edx, 255    ;
+	cmp eax, edx    ;
+	cmovg eax, edx  ;
+	xor edx, edx    ;
+	test eax, eax   ;
+	cmovs eax, edx  ; clamp to <0; 255>
+	mov [edi+1], al
 	; fetch and store red
 	fist dword [esp]
 	mov eax, [esp]
-	mov [ebx+2], al
+	mov edx, 255    ;
+	cmp eax, edx    ;
+	cmovg eax, edx  ;
+	xor edx, edx    ;
+	test eax, eax   ;
+	cmovs eax, edx  ; clamp to <0; 255>
+	mov [edi+2], al
 	; calculate colors for the next pixel
 	fadd st3  ; red
 	fdecstp
 	fadd st3  ; green
 	fdecstp
 	fadd st3  ; blue
-	add ebx, 3
+	add edi, 3
 	inc ecx
-	cmp ecx, [max_x]  ; check loop condition
+	cmp ecx, ebx  ; check loop condition
 	jle draw_triangle_x_loop
 
 	add esp, 4
-	fstp st0  ;
-	fstp st0  ;
-	fstp st0  ;
-	fstp st0  ;
-	fstp st0  ;
-	fstp st0  ; clear FPU
+	times 6 fstp st0  ; clear FPU
 draw_triangle_x_after_loop:
 	pop ecx  ; get back the vertical loop counter
 	inc ecx
