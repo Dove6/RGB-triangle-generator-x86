@@ -276,13 +276,13 @@ calc_minmax_y:
 	and eax, 0xfffffffc  ; discard 3 least-significant bits
 	mov [stride], eax
 
-draw_triangle_y_pre_loop:
+draw_triangle_y_before_loop:
 	; prepare vertical loop counter and calculate initial position/color values
 	;  for the convenience of modification in-loop
 	; esi - vertices
 	mov ecx, [min_y]
 	cmp ecx, [max_y]
-	jg draw_triangle_y_loop_end
+	jg draw_triangle_y_after_loop
 	; choose currently needed vertex and vertical step data
 	mov edi, esi ;
 	add edi, 12  ; edi - address of (*vertices)[1]
@@ -338,7 +338,7 @@ draw_triangle_y_pre_loop:
 	movzx eax, al
 	mov [esp], eax  ; expanded (*vertices)[?].colG
 	fiadd dword [esp]
-	fst dword [left+8]  ; left.g
+	fst dword [left+0x8]  ; left.g
 	fistp dword [left+0x18]  ; left.int_g
 
 	; calculate the initial value of left.b (and left.int_b)
@@ -421,14 +421,12 @@ draw_triangle_y_pre_loop:
 
 draw_triangle_y_loop:
 	; vertical loop for y (ecx) in range <min_y; max_y>
-	cmp ecx, [max_y]
-	jg draw_triangle_y_loop_end
 	lea edi, [left]
 	lea edx, [right]
 	mov eax, [edi+0x10]  ; left.int_x
 	mov ebx, [edx+0x10]  ; right.int_x
 	cmp eax, ebx
-	jz draw_triangle_x_pre_loop
+	jz draw_triangle_x_before_loop
 	; exchange left and right pointer if left.int_x > right.int_x
 	cmovg eax, edi
 	cmovg edi, edx
@@ -458,7 +456,7 @@ draw_triangle_y_loop:
 	fstp dword [horizontal_step+0x8]
 	fstp st0 ; clear fpu
 
-draw_triangle_x_pre_loop:
+draw_triangle_x_before_loop:
 	; prepare horizontal loop counter and calculate initial color values
 	;  for the convenience of modification in-loop
 	; clamp minimal and maximal x values to fit the bitmap
@@ -477,6 +475,8 @@ draw_triangle_x_pre_loop:
 	mov [max_x], eax
 	push ecx  ; put vertical counter on the stack
 	mov ecx, [min_x]  ; fetch initial horizontal counter
+	cmp ecx, eax
+	jg draw_triangle_x_after_loop
 	; calculate initial color values
 	;  the values are stored in FPU during the horizontal loop
 	;  st3 - horizontal step multiplier
@@ -487,30 +487,29 @@ draw_triangle_x_pre_loop:
 	mov ebx, [edi+0x10]  ; left-most int_x
 	sub eax, ebx
 	push eax
-	fild dword [esp]  ; horizontal step multiplier: (i - left x) where i = ecx
-	add esp, 4
-	; red = left r + (i - left x) * horizontal_step.r
+	; load horizontal_step values for quick addition
 	fld dword [horizontal_step+0x0]
-	fmul st1
+	fld dword [horizontal_step+0x4]
+	fld dword [horizontal_step+0x8]
+	; red = left r + (i - left x) * horizontal_step.r
+	fld st2
+	fimul dword [esp]
 	fiadd dword [edi+0x14]  ; left-most int_r
 	; green = left g + (i - left x) * horizontal_step.g
-	fld dword [horizontal_step+0x4]
-	fmul st2
+	fld st2
+	fimul dword [esp]
 	fiadd dword [edi+0x18]  ; left-most int_g
 	; blue = left b + (i - left x) * horizontal_step.b
-	fld dword [horizontal_step+0x8]
-	fmul st3
+	fld st2
+	fimul dword [esp]
 	fiadd dword [edi+0x1c]  ; left-most int_b
 	; calculate memory address of the first pixel in a row
 	mov ebx, ecx  ;
 	shl ebx, 1    ;
 	add ebx, ecx  ; multiply min_x by 3
 	add ebx, [row_address]
-	sub esp, 4
 draw_triangle_x_loop:
 	; horizontal loop for x (ecx) in range <min_x; max_x>
-	cmp ecx, [max_x]  ; check loop condition
-	jg draw_triangle_x_loop_end
 	; fetch and store blue
 	fist dword [esp]
 	fincstp
@@ -526,20 +525,24 @@ draw_triangle_x_loop:
 	mov eax, [esp]
 	mov [ebx+2], al
 	; calculate colors for the next pixel
-	fadd dword [horizontal_step+0x0]  ; red
+	fadd st3  ; red
 	fdecstp
-	fadd dword [horizontal_step+0x4]  ; green
+	fadd st3  ; green
 	fdecstp
-	fadd dword [horizontal_step+0x8]  ; blue
+	fadd st3  ; blue
 	add ebx, 3
 	inc ecx
-	jmp draw_triangle_x_loop
-draw_triangle_x_loop_end:
+	cmp ecx, [max_x]  ; check loop condition
+	jle draw_triangle_x_loop
+
 	add esp, 4
 	fstp st0  ;
 	fstp st0  ;
 	fstp st0  ;
+	fstp st0  ;
+	fstp st0  ;
 	fstp st0  ; clear FPU
+draw_triangle_x_after_loop:
 	pop ecx  ; get back the vertical loop counter
 	inc ecx
 	mov eax, [row_address]  ;
@@ -584,10 +587,10 @@ draw_triangle_x_loop_end:
 	fadd dword [vertical_step+0x1c] ; vertical_step[1].b
 	fst dword [right+0xc]     ;
 	fistp dword [right+0x1c]  ; save right.b
+	cmp ecx, [max_y]
+	jle draw_triangle_y_loop
 
-	jmp draw_triangle_y_loop
-draw_triangle_y_loop_end:
-
+draw_triangle_y_after_loop:
     xor eax, eax ; return 0
 
 draw_triangle_cleanup:

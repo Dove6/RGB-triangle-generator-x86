@@ -12,4 +12,12 @@ draw 40 70 #ff0000 60 70 #00ff00 60 50 #0000ff
 draw 40 71 #ff0000 60 71 #00ff00 60 91 #0000ff
 draw 81 70 #ff0000 61 70 #00ff00 61 50 #0000ff
 draw 81 71 #ff0000 61 71 #00ff00 61 91 #0000ff
+draw -6 -6 #ffff00 -6 15 #00ffff 15 -6 #ff00ff
+draw 261 -6 #ffff00 261 15 #00ffff 240 -6 #ff00ff
+draw 261 261 #ffff00 261 240 #00ffff 240 261 #ff00ff
+draw -6 261 #ffff00 -6 240 #00ffff 15 261 #ff00ff
+draw 9 128 #ff00ff -6 116 #ffff00 -6 140 #00ffff
+draw 128 9 #ff00ff 116 -6 #ffff00 140 -6 #00ffff
+draw 246 128 #ff00ff 261 116 #ffff00 261 140 #00ffff
+draw 128 246 #ff00ff 116 261 #ffff00 140 261 #00ffff
 quit
