@@ -90,430 +90,500 @@ draw_triangle:
 	call memset  ; memset(ebp-local_size, 0, local_size)
 	add esp, 12
 	
+	; prepare FPU
+	finit
+	
 	; save the callee-saved registers on the stack
 	push ebx
 	push esi
 	push edi
 
-calc_step0:
+calc_vertical_step0:
+	; calculate vertical steps for line interpolation of x position and colors
+	;  between the first and the second vertex
+	; first vertex offset = 0 * 12
+	; second vertex offset = 1 * 12
 	mov ebx, [vertices]
-	mov eax, [ebx+4] ; *vertices + 0 * 12 + 4 (posY)
-	mov [min_y], eax ; save *vertices[0].posY as min_y
-	sub eax, [ebx+12+4] ; *vertices + 1 * 12 + 4 (posY)
-	jz calc_step1
-	finit
-	push eax         ;
-	fild dword [esp] ; load position difference to FPU
-	fild dword [ebx] ; *vertices + 0 * 12 + 0 (posX)
-	fisub dword [ebx+12] ; *vertices + 1 * 12 + 0 (posX)
+	mov eax, [ebx+0x0+0x4]  ; (*vertices)[0].posY
+	mov [min_y], eax  ; save (*vertices)[0].posY as min_y (assuming the vertices are sorted)
+	sub eax, [ebx+0xc+0x4]  ; (*vertices)[1].posY
+	jz calc_vertical_step1  ; if positions are equal, skip to the next step
+	push eax          ;
+	fild dword [esp+0x0+0x0]  ; load y position difference into FPU
+	; vertical_step[0].x = ((*vertices)[0].posX - (*vertices)[1].posX) / ((*vertices)[0].posY - (*vertices)[1].posY)
+	fild dword [ebx+0x0+0x0]  ; load (*vertices)[0].posX into FPU
+	fisub dword [ebx+0xc+0x0]  ; subtract (*vertices)[1].posX
 	fdiv st0, st1
-	fstp dword [vertical_step] ; store result in vertical_step + 0 * 16 + 0 (x)
-	movzx eax, byte [ebx+8] ; *vertices + 0 * 12 + 8 (colR)
+	fstp dword [vertical_step+0x0]  ; store result in vertical_step[0].x
+	; vertical_step[0].r = ((*vertices)[0].colR - (*vertices)[1].colR) / ((*vertices)[0].posY - (*vertices)[1].posY)
+	movzx eax, byte [ebx+0x0+0x8]  ; zero-extend 8-bit (*vertices)[0].colR to 32-bits
 	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+12+8] ; *vertices + 1 * 12 + 8 (colR)
+	movzx eax, byte [ebx+0xc+0x8]  ; zero-extend 8-bit (*vertices)[1].colR to 32-bits
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+4] ; store result in vertical_step + 0 * 16 + 4 (r)
-	movzx eax, byte [ebx+9] ; *vertices + 0 * 12 + 9 (colG)
-	push eax
+	fstp dword [vertical_step+0x4]  ; store result in vertical_step[0].r
+	; vertical_step[0].g = ((*vertices)[0].colG - (*vertices)[1].colG) / ((*vertices)[0].posY - (*vertices)[1].posY)
+	movzx eax, byte [ebx+0x0+0x9]  ; (*vertices)[0].colG
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+12+9] ; *vertices + 1 * 12 + 9 (colG)
+	movzx eax, byte [ebx+0xc+0x9]  ; (*vertices)[1].colG
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+8] ; store result in vertical_step + 0 * 16 + 8 (g)
-	movzx eax, byte [ebx+10] ; *vertices + 0 * 12 + 10 (colB)
-	push eax
+	fstp dword [vertical_step+0x8]  ; store result in vertical_step[0].g
+	; vertical_step[0].b = ((*vertices)[0].colB - (*vertices)[1].colB) / ((*vertices)[0].posY - (*vertices)[1].posY)
+	movzx eax, byte [ebx+0x0+0xa]  ; (*vertices)[0].colB
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+22] ; *vertices + 1 * 12 + 10 (colB)
+	movzx eax, byte [ebx+0xc+0xa]  ; (*vertices)[1].colB
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+12] ; store result in vertical_step + 0 * 16 + 12 (b)
+	fstp dword [vertical_step+0xc]  ; store result in vertical_step[0].b
 	fstp st0
 	add esp, 4
 
-calc_step1:
-	mov eax, [ebx+4] ; *vertices + 0 * 12 + 4 (posY)
-	mov edx, [ebx+2*12+4] ; *vertices + 2 * 12 + 4 (posY)
-	mov [max_y], edx ; save *vertices[2].posY as max_y
+calc_vertical_step1:
+	; calculate vertical steps for line interpolation of x position and colors
+	;  between the first and the third vertex
+	; first vertex offset = 0 * 12
+	; third vertex offset = 2 * 12
+	mov eax, [ebx+0x0+0x4]  ; (*vertices)[0].posY
+	mov edx, [ebx+0x18+0x4]  ; (*vertices)[2]posY
+	mov [max_y], edx  ; save (*vertices[2]).posY as max_y (assuming the vertices are sorted)
 	sub eax, edx
-	jz calc_step2
-	push eax         ;
-	fild dword [esp] ; load position difference to FPU
-	fild dword [ebx] ; *vertices + 0 * 12 + 0 (posX)
-	fisub dword [ebx+2*12] ; *vertices + 2 * 12 + 0 (posX)
+	jz calc_vertical_step2
+	push eax          ;
+	fild dword [esp]  ; load position difference into FPU
+	; vertical_step[1].x = ((*vertices)[0].posX - (*vertices)[2].posX) / ((*vertices)[0].posY - (*vertices)[2].posY)
+	fild dword [ebx+0x0+0x0]  ; (*vertices)[0].posX
+	fisub dword [ebx+0x18+0x0]  ; (*vertices)[2].posX
 	fdiv st0, st1
-	fstp dword [vertical_step+16] ; store result in vertical_step + 1 * 16 + 0 (x)
-	movzx eax, byte [ebx+8] ; *vertices + 0 * 12 + 8 (colR)
+	fstp dword [vertical_step+0x10+0x0]  ; store result in vertical_step[1].x
+	; vertical_step[1].r = ((*vertices)[0].colR - (*vertices)[2].colR) / ((*vertices)[0].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0x0+0x8]  ; (*vertices)[0].colR
 	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+8] ; *vertices + 2 * 12 + 8 (colR)
+	movzx eax, byte [ebx+0x18+0x8]  ; (*vertices)[2].colR
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+16+4] ; store result in vertical_step + 1 * 16 + 4 (r)
-	movzx eax, byte [ebx+9] ; *vertices + 0 * 12 + 9 (colG)
-	push eax
+	fstp dword [vertical_step+0x10+0x4]  ; store result in vertical_step[1].r
+	; vertical_step[1].g = ((*vertices)[0].colG - (*vertices)[2].colG) / ((*vertices)[0].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0x0+0x9]  ; (*vertices)[0].colG
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+9] ; *vertices + 2 * 12 + 9 (colG)
+	movzx eax, byte [ebx+0x18+0x9]  ; (*vertices)[2].colG
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+16+8] ; store result in vertical_step + 1 * 16 + 8 (g)
-	movzx eax, byte [ebx+10] ; *vertices + 0 * 12 + 10 (colB)
-	push eax
+	fstp dword [vertical_step+0x10+0x8]  ; store result in vertical_step[1].g
+	; vertical_step[1].b = ((*vertices)[0].colB - (*vertices)[2].colB) / ((*vertices)[0].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0x0+0xa]  ; (*vertices)[0].colB
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+10] ; *vertices + 2 * 12 + 10 (colB)
+	movzx eax, byte [ebx+0x18+0xa]  ; (*vertices)[2].colB
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+16+12] ; store result in vertical_step + 1 * 16 + 12 (b)
+	fstp dword [vertical_step+0x10+0xc]  ; store result in vertical_step[1].b
 	fstp st0
 	add esp, 4
 
-calc_step2:
-	mov eax, [ebx+12+4] ; *vertices + 1 * 12 + 4 (posY)
-	sub eax, [ebx+2*12+4] ; *vertices + 2 * 12 + 4 (posY)
+calc_vertical_step2:
+	; calculate vertical steps for line interpolation of x position and colors
+	;  between the second and the third vertex
+	; second vertex offset = 1 * 12
+	; third vertex offset = 2 * 12
+	mov eax, [ebx+0xc+0x4]  ; (*vertices)[1].posY
+	sub eax, [ebx+0x18+0x4]  ; (*vertices)[2].posY
 	jz calc_minmax_y
-	push eax         ;
-	fild dword [esp] ; load position difference to FPU
-	fild dword [ebx+12] ; *vertices + 1 * 12 + 0 (posX)
-	fisub dword [ebx+2*12] ; *vertices + 2 * 12 + 0 (posX)
+	push eax          ;
+	fild dword [esp]  ; load position difference into FPU
+	; vertical_step[2].x = ((*vertices)[1].posX - (*vertices)[2].posX) / ((*vertices)[1].posY - (*vertices)[2].posY)
+	fild dword [ebx+0xc+0x0]  ; (*vertices)[1].posX
+	fisub dword [ebx+0x18+0x0]  ; (*vertices)[2].posX
 	fdiv st0, st1
-	fstp dword [vertical_step+2*16] ; store result in vertical_step + 2 * 16 + 0 (x)
-	movzx eax, byte [ebx+12+8] ; *vertices + 1 * 12 + 8 (colR)
+	fstp dword [vertical_step+0x20+0x0]  ; store result in vertical_step[2].x
+	; vertical_step[2].r = ((*vertices)[1].colR - (*vertices)[2].colR) / ((*vertices)[1].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0xc+0x8]  ; (*vertices)[1].colR
 	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+8] ; *vertices + 2 * 12 + 8 (colR)
+	movzx eax, byte [ebx+0x18+0x8]  ; (*vertices)[2].colR
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+2*16+4] ; store result in vertical_step + 2 * 16 + 4 (r)
-	movzx eax, byte [ebx+12+9] ; *vertices + 1 * 12 + 9 (colG)
-	push eax
+	fstp dword [vertical_step+0x20+0x4]  ; store result in vertical_step[2].r
+	; vertical_step[2].g = ((*vertices)[1].colG - (*vertices)[2].colG) / ((*vertices)[1].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0xc+0x9]  ; (*vertices)[1].colG
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+9] ; *vertices + 2 * 12 + 9 (colG)
+	movzx eax, byte [ebx+0x18+0x9]  ; (*vertices)[2].colG
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+2*16+8] ; store result in vertical_step + 2 * 16 + 8 (g)
-	movzx eax, byte [ebx+12+10] ; *vertices + 1 * 12 + 10 (colB)
-	push eax
+	fstp dword [vertical_step+0x20+0x8]  ; store result in vertical_step[2].g
+	; vertical_step[2].b = ((*vertices)[1].colB - (*vertices)[2].colB) / ((*vertices)[1].posY - (*vertices)[2].posY)
+	movzx eax, byte [ebx+0xc+0xa]  ; (*vertices)[1].colB
+	mov [esp], eax
 	fild dword [esp]
-	movzx eax, byte [ebx+2*12+10] ; *vertices + 2 * 12 + 10 (colB)
+	movzx eax, byte [ebx+0x18+0xa]  ; (*vertices)[2].colB
 	mov [esp], eax
 	fisub dword [esp]
 	fdiv st0, st1
-	fstp dword [vertical_step+2*16+12] ; store result in vertical_step + 2 * 16 + 12 (b)
+	fstp dword [vertical_step+0x20+0xc]  ; store result in vertical_step[2].b
 	fstp st0
 	add esp, 4
 
 calc_minmax_y:
+	; clamp minimal and maximal y values to fit the bitmap
+	;  this allows to draw triangles only partially present inside bitmap boundaries
+	;  with correct coloring
 	; min_y = max(min_y, 0)
 	mov esi, ebx
 	xor ebx, ebx
-	mov eax, [min_y] ; load min_y
+	mov eax, [min_y]  ; load min_y
 	test eax, eax
 	cmovl eax, ebx
-	mov [min_y], eax ; store min_y
+	mov [min_y], eax  ; store min_y
 
 	; max_y = min(max_y, abs(info_header->biHeight) - 1)
 	mov ebx, [info_header]
-	mov eax, [ebx+8] ; info_header->biHeight
-	mov edx, eax ;
-	sar edx, 31  ;
-	xor eax, edx ;
-	sub eax, edx ; get absolute height
+	mov eax, [ebx+0x8]  ; info_header->biHeight
+	mov edx, eax  ;
+	sar edx, 31   ;
+	xor eax, edx  ;
+	sub eax, edx  ; get absolute height
 	sub eax, 1
-	mov edx, [max_y] ; load max_y
+	mov edx, [max_y]  ; load max_y
 	cmp eax, edx
 	cmovl edx, eax
-	mov [max_y], edx ; store max_y
+	mov [max_y], edx  ; store max_y
 
-	mov eax, [ebx+4] ; info_header->biWidth
-	mov ebx, eax ;
-	sar ebx, 31  ;
-	xor eax, ebx ;
-	sub eax, ebx ; get absolute value of width
-	mov [abs_width], eax
-	mov ebx, eax ;
-	shl eax, 1   ;
-	add eax, ebx ; multiply eax by 3
+	; calculate row stride
+	mov eax, [ebx+0x4]  ; info_header->biWidth
+	mov ebx, eax  ;
+	sar ebx, 31   ;
+	xor eax, ebx  ;
+	sub eax, ebx  ; get absolute value of width
+	mov [abs_width], eax  ; store that value for later use
+	mov ebx, eax  ;
+	shl eax, 1    ;
+	add eax, ebx  ; multiply eax by 3
 	add eax, 3
-	and eax, 0xfffffffc
+	and eax, 0xfffffffc  ; discard 3 least-significant bits
 	mov [stride], eax
 
-	mov ecx, [min_y]
 draw_triangle_y_pre_loop:
+	; prepare vertical loop counter and calculate initial position/color values
+	;  for the convenience of modification in-loop
+	; esi - vertices
+	mov ecx, [min_y]
 	cmp ecx, [max_y]
 	jg draw_triangle_y_loop_end
-	mov edi, esi ; (*vertices)[0]
-	add edi, 12 ; (*vertices)[1]
-	lea ebx, [vertical_step] ; vertical_step[0]
+	; choose currently needed vertex and vertical step data
+	mov edi, esi ;
+	add edi, 12  ; edi - address of (*vertices)[1]
+	lea ebx, [vertical_step+0x0]  ; vertical_step[0]
 	mov edx, ebx
-	add ebx, 32 ; vertical_step[2]
-	cmp ecx, [edi+4] ; *vertices + 1 * 12 + 4 (posY)
-	cmovl edi, esi ; reset to (*vertices)[0]
-	cmovl ebx, edx ; reset to vertical_step[0]
-	; zero eax, edx
-	; ebx - appropriate vertical_step
-	; edi - appropriate vertex
-	; esi - original vertices
+	add ebx, 32  ; ebx - vertical_step[2]
+	cmp ecx, [edi+0x0+0x4]  ; compare initial counter value against (*vertices)[1].posY
+	cmovl edi, esi  ; reset to the address of (*vertices)[0]
+	cmovl ebx, edx  ; reset to vertical_step[0]
+	xor eax, eax
+	xor edx, edx
+	; ebx - suitable vertical_step
+	; edi - suitable vertex
 
-	; calculate initial left x
-	mov eax, [ebx]
-	push eax  ; vertical_step x (float)
+	; calculate the initial value of left.x (and left.int_x)
+	; left.x = (*vertices)[?].posX + (i - (*vertices)[?].posY) * vertical_step[?].x
+	;  where i = counter (ecx) = current row index
+	mov eax, ecx
+	sub eax, [edi+0x4]
+	push eax  ; vertical step multiplier: (i - (*vertices)[?].posY)
+	fild dword [esp]
+	mov eax, [ebx+0x0]
+	mov [esp], eax  ; vertical_step[?].x
 	fld dword [esp]
-	mov edx, ecx
-	sub edx, [edi+4]
-	push edx  ; vertical_step multiplier: i - vertices posY (int32_t)
-	fimul dword [esp]
-	fld st0
-	mov eax, [edi]
-	push eax ; starting value: vertices posX (int32_t)
+	fmul st0, st1
+	mov eax, [edi+0x0]
+	mov [esp], eax  ; (*vertices)[?].posX
 	fiadd dword [esp]
-	fst dword [left]  ; left + 0 (x)
-	fistp dword [left+0x10]  ; left + 16 (integer) + 0 (x)
-	; float TOP -> i - vertices posY
+	fst dword [left+0x0]  ; left.x
+	fistp dword [left+0x10]  ; left.int_x
+	; st0 - vertical step multiplier for the left
+
+	; calculate the initial value of left.r (and left.int_r)
+	; left.r = (*vertices)[?].colR + (i - (*vertices)[?].posY) * vertical_step[?].r
+	mov eax, [ebx+0x4]
+	mov [esp], eax  ; vertical_step[?].r
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [edi+0x8]
+	movzx eax, al
+	mov [esp], eax  ; expanded (*vertices)[?].colR
+	fiadd dword [esp]
+	fst dword [left+0x4]  ; left.r
+	fistp dword [left+0x14]  ; left.int_r
+
+	; calculate the initial value of left.g (and left.int_g)
+	; left.g = (*vertices)[?].colG + (i - (*vertices)[?].posY) * vertical_step[?].g
+	mov eax, [ebx+0x8]
+	mov [esp], eax  ; vertical_step[?].g
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [edi+0x9]
+	movzx eax, al
+	mov [esp], eax  ; expanded (*vertices)[?].colG
+	fiadd dword [esp]
+	fst dword [left+8]  ; left.g
+	fistp dword [left+0x18]  ; left.int_g
+
+	; calculate the initial value of left.b (and left.int_b)
+	; left.b = (*vertices)[?].colB + (i - (*vertices)[?].posY) * vertical_step[?].b
+	mov eax, [ebx+0xc]
+	mov [esp], eax  ; vertical_step[?].b
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [edi+0xa]
+	movzx eax, al
+	mov [esp], eax  ; expanded (*vertices)[?].colB
+	fiadd dword [esp]
+	fst dword [left+0xc]  ; left.b
+	fistp dword [left+0x1c]  ; left.int_b
+	fstp st0
+
+	; calculate the initial value of right.x (and right.int_x)
+	; right.x = (*vertices)[0].posX + (i - (*vertices)[0].posY) * vertical_step[1].x
+	mov eax, ecx
+	sub eax, [esi+0x0+0x4]
+	mov [esp], eax  ; vertical step multiplier: (i - (*vertices)[0].posY)
+	fild dword [esp]
+	mov eax, [vertical_step+0x10+0x0]
+	mov [esp], eax  ; vertical_step[1].x
+	fld dword [esp]
+	fmul st0, st1
+	mov eax, [esi+0x0+0x0]
+	mov [esp], eax  ; vertices[0].posX
+	fiadd dword [esp]
+	fst dword [right+0x0]  ; right.x
+	fistp dword [right+0x10]  ; right.int_x
+	; st0 - vertical step multiplier for the right
+
+	; calculate the initial value of right.r (and right.int_r)
+	; right.r = (*vertices)[0].colR + (i - (*vertices)[0].posY) * vertical_step[1].r
+	mov eax, [vertical_step+0x10+0x4]
+	mov [esp], eax  ; vertical_step[1].r
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [esi+0x8]
+	movzx eax, al
+	mov [esp], eax  ; expanded vertices[0].colR
+	fiadd dword [esp]
+	fst dword [right+0x4]  ; right.r
+	fistp dword [right+0x14]  ; right.int_r
+
+	; calculate the initial value of right.g (and right.int_g)
+	; right.g = (*vertices)[0].colG + (i - (*vertices)[0].posY) * vertical_step[1].g
+	mov eax, [vertical_step+0x10+0x8]
+	mov [esp], eax  ; vertical_step[1].g
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [esi+0x9]
+	movzx eax, al
+	mov [esp], eax  ; expanded vertices[0].colG
+	fiadd dword [esp]
+	fst dword [right+0x8]  ; right.g
+	fistp dword [right+0x18]  ; right.int_g
+
+	; calculate the initial value of right.b (and right.int_b)
+	; right.b = (*vertices)[0].colB + (i - (*vertices)[0].posY) * vertical_step[1].b
+	mov eax, [vertical_step+0x10+0xc]
+	mov [esp], eax  ; vertical_step[1].b (float)
+	fld dword [esp]
+	fmul st0, st1
+	mov al, [esi+0xa]
+	movzx eax, al
+	mov [esp], eax  ; expanded vertices[0].colB
+	fiadd dword [esp]
+	fst dword [right+0xc]  ; right.b
+	fistp dword [right+0x1c]  ; right.int_b
+	fstp st0
 	add esp, 4
 
-	; calculate initial left r
-	mov eax, [ebx+4]
-	mov [esp+4], eax ; vertical_step r (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [edi+8]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices colR (int32_t)
-	fiadd dword [esp]
-	fst dword [left+4]  ; left + 4 (r)
-	fistp dword [left+0x10+4]  ; left + 16 (integer) + 4 (r)
-
-	; calculate initial left g
-	mov eax, [ebx+8]
-	mov [esp+4], eax  ; vertical_step g (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [edi+9]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices colG (int32_t)
-	fiadd dword [esp]
-	fst dword [left+8]  ; left + 8 (g)
-	fistp dword [left+0x10+8]  ; left + 16 (integer) 8 (g)
-
-	; calculate initial left b
-	mov eax, [ebx+12]
-	mov [esp+4], eax  ; vertical_step b (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [edi+10]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices colB (int32_t)
-	fiadd dword [esp]
-	fst dword [left+12]  ; left + 12 (b)
-	fistp dword [left+0x10+12]  ; left + 16 (integer) + 12 (b)
-
-	; calculate initial right x
-	mov eax, [vertical_step+16]
-	mov [esp+4], eax  ; vertical_step[1].x (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov eax, [esi]
-	mov [esp], eax  ; starting value: vertices[0].posX (int32_t)
-	fiadd dword [esp]
-	fst dword [right]  ; right + 0 (x)
-	fistp dword [right+0x10]  ; right + 16 (integer) + 0 (x)
-
-	; calculate initial right r
-	mov eax, [vertical_step+16+4]
-	mov [esp+4], eax  ; vertical_step[1].r (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [esi+8]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices[0].colR (int32_t)
-	fiadd dword [esp]
-	fst dword [right+4]  ; right + 4 (r)
-	fistp dword [right+0x10+4]  ; right + 16 (integer) + 4 (r)
-
-	; calculate initial right g
-	mov eax, [vertical_step+16+8]
-	mov [esp+4], eax  ; vertical_step[1].g (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [esi+9]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices[0].colG (int32_t)
-	fiadd dword [esp]
-	fst dword [right+8]  ; right + 8 (g)
-	fistp dword [right+0x10+8]  ; right + 16 (integer) + 8 (g)
-
-	; calculate initial right b
-	mov eax, [vertical_step+16+12]
-	mov [esp+4], eax  ; vertical_step[1].b (float)
-	fld dword [esp+4]
-	fmul st0, st1
-	mov al, [esi+10]
-	movzx eax, al  ; expand uint8_t to uint32_t
-	mov [esp], eax  ; starting value: vertices[0].colB (int32_t)
-	fiadd dword [esp]
-	fst dword [right+12]  ; right + 12 (b)
-	fistp dword [right+0x10+12]  ; right + 16 (integer) + 12 (b)
-
-	fstp st0
-	add esp, 8
 	; calculate row address
 	mov eax, [stride]
 	mul dword [min_y]
 	add eax, [image_data]
 	mov [row_address], eax
+
 draw_triangle_y_loop:
+	; vertical loop for y (ecx) in range <min_y; max_y>
 	cmp ecx, [max_y]
 	jg draw_triangle_y_loop_end
-	sub esp, 4
 	lea edi, [left]
 	lea edx, [right]
 	mov eax, [edi+0x10]  ; left.int_x
 	mov ebx, [edx+0x10]  ; right.int_x
 	cmp eax, ebx
 	jz draw_triangle_x_pre_loop
-	; "exchange" if left.int_x > right.int_x
+	; exchange left and right pointer if left.int_x > right.int_x
 	cmovg eax, edi
 	cmovg edi, edx
 	cmovg edx, eax
 	cmovg eax, ebx
 	cmovg ebx, [edx+0x10]
 	
+	; calculate horizontal steps for line interpolation of colors between the ends of the horizontal line
 	sub eax, ebx
-	mov [esp], eax
+	push eax  ; x position difference
 	fild dword [esp]
-	; calculate red step
-	fld dword [edi+4]
-	fsub dword [edx+4]
-	fdiv st0, st1
-	fstp dword [horizontal_step]
-	; calculate green step
-	fld dword [edi+8]
-	fsub dword [edx+8]
-	fdiv st0, st1
-	fstp dword [horizontal_step+4]
-	; calculate blue step
-	fld dword [edi+12]
-	fsub dword [edx+12]
-	fdiv st0, st1
-	fstp dword [horizontal_step+8]
-	fstp st0 ; clear fpu
 	add esp, 4
+	; horizontal_step.r = (left r - right r) / (left x - right x)
+	fld dword [edi+0x4]
+	fsub dword [edx+0x4]
+	fdiv st0, st1
+	fstp dword [horizontal_step+0x0]
+	; horizontal_step.g = (left g - right g) / (left x - right x)
+	fld dword [edi+0x8]
+	fsub dword [edx+0x8]
+	fdiv st0, st1
+	fstp dword [horizontal_step+0x4]
+	; horizontal_step.b = (left b - right b) / (left x - right x)
+	fld dword [edi+0xc]
+	fsub dword [edx+0xc]
+	fdiv st0, st1
+	fstp dword [horizontal_step+0x8]
+	fstp st0 ; clear fpu
 
 draw_triangle_x_pre_loop:
+	; prepare horizontal loop counter and calculate initial color values
+	;  for the convenience of modification in-loop
+	; clamp minimal and maximal x values to fit the bitmap
+	; min_x = max(left x, 0)
 	mov eax, [edi+0x10]  ; left-most int_x
 	xor ebx, ebx
 	cmp eax, ebx
 	cmovl eax, ebx
 	mov [min_x], eax
+	; max_x = min(right x, abs_width - 1)
 	mov eax, [edx+0x10]  ; right-most int_x
 	mov ebx, [abs_width]
 	dec ebx
 	cmp eax, ebx
 	cmovg eax, ebx
 	mov [max_x], eax
-	push ecx
-	mov ecx, [min_x]
+	push ecx  ; put vertical counter on the stack
+	mov ecx, [min_x]  ; fetch initial horizontal counter
+	; calculate initial color values
+	;  the values are stored in FPU during the horizontal loop
+	;  st3 - horizontal step multiplier
+	;  st2 - red
+	;  st1 - green
+	;  st0 - blue
 	mov eax, ecx
 	mov ebx, [edi+0x10]  ; left-most int_x
 	sub eax, ebx
 	push eax
-	fild dword [esp]
-	fld dword [horizontal_step]
-	fmul st1
-	fiadd dword [edi+0x10+4]  ; left-most int_r
-	fld dword [horizontal_step+4]
-	fmul st2
-	fiadd dword [edi+0x10+8]  ; left-most int_g
-	fld dword [horizontal_step+8]
-	fmul st3
-	fiadd dword [edi+0x10+12]  ; left-most int_b
+	fild dword [esp]  ; horizontal step multiplier: (i - left x) where i = ecx
 	add esp, 4
+	; red = left r + (i - left x) * horizontal_step.r
+	fld dword [horizontal_step+0x0]
+	fmul st1
+	fiadd dword [edi+0x14]  ; left-most int_r
+	; green = left g + (i - left x) * horizontal_step.g
+	fld dword [horizontal_step+0x4]
+	fmul st2
+	fiadd dword [edi+0x18]  ; left-most int_g
+	; blue = left b + (i - left x) * horizontal_step.b
+	fld dword [horizontal_step+0x8]
+	fmul st3
+	fiadd dword [edi+0x1c]  ; left-most int_b
+	; calculate memory address of the first pixel in a row
 	mov ebx, ecx  ;
 	shl ebx, 1    ;
 	add ebx, ecx  ; multiply min_x by 3
 	add ebx, [row_address]
+	sub esp, 4
 draw_triangle_x_loop:
+	; horizontal loop for x (ecx) in range <min_x; max_x>
 	cmp ecx, [max_x]  ; check loop condition
 	jg draw_triangle_x_loop_end
-	sub esp, 4
+	; fetch and store blue
 	fist dword [esp]
 	fincstp
 	mov eax, [esp]
-	mov [ebx], al  ; save blue
+	mov [ebx], al
+	; fetch and store green
 	fist dword [esp]
 	fincstp
 	mov eax, [esp]
-	mov [ebx+1], al  ; save green
+	mov [ebx+1], al
+	; fetch and store red
 	fist dword [esp]
 	mov eax, [esp]
-	mov [ebx+2], al  ; save red
-	; calc next colors
-	fadd dword [horizontal_step]  ; red
+	mov [ebx+2], al
+	; calculate colors for the next pixel
+	fadd dword [horizontal_step+0x0]  ; red
 	fdecstp
-	fadd dword [horizontal_step+4]  ; green
+	fadd dword [horizontal_step+0x4]  ; green
 	fdecstp
-	fadd dword [horizontal_step+8]  ; blue
-	add esp, 4
+	fadd dword [horizontal_step+0x8]  ; blue
 	add ebx, 3
 	inc ecx
 	jmp draw_triangle_x_loop
 draw_triangle_x_loop_end:
+	add esp, 4
 	fstp st0  ;
 	fstp st0  ;
 	fstp st0  ;
-	fstp st0  ; clear fpu
+	fstp st0  ; clear FPU
 	pop ecx  ; get back the vertical loop counter
 	inc ecx
-	mov eax, [row_address]
-	add eax, [stride]
-	mov [row_address], eax
-	; update left and right
-	fld dword [left]
-	mov eax, [esi+12+4]  ; (*vertices)[1].posY
-	lea ebx, [vertical_step+32]
-	cmp ecx, eax
-	lea eax, [vertical_step]
-	cmovg eax, ebx
-	fadd dword [eax]  ; vertical_step x
-	fst dword [left]         ;
+	mov eax, [row_address]  ;
+	add eax, [stride]       ;
+	mov [row_address], eax  ; calculate the memory address of the next row
+	; update left and right ends of horizontal line
+	;  by adding appropriate step values to their position/color
+	fld dword [left+0x0]
+	mov eax, [esi+0xc+0x4]  ; (*vertices)[1].posY
+	lea ebx, [vertical_step+0x20]  ;
+	cmp ecx, eax                   ;
+	lea eax, [vertical_step+0x0]   ;
+	cmovg eax, ebx                 ; place suitable vertical_step in eax
+	fadd dword [eax+0x0]  ; vertical_step[?].x
+	fst dword [left+0x0]    ;
 	fistp dword [left+0x10]  ; save left.x
-	fld dword [left+4]
-	fadd dword [eax+4]  ; vertical_step r
-	fst dword [left+4]         ;
-	fistp dword [left+0x10+4]  ; save left.r
-	fld dword [left+8]
-	fadd dword [eax+8]  ; vertical_step g
-	fst dword [left+8]         ;
-	fistp dword [left+0x10+8]  ; save left.g
-	fld dword [left+12]
-	fadd dword [eax+12] ; vertical_step b
-	fst dword [left+12]         ;
-	fistp dword [left+0x10+12]  ; save left.b
-	fld dword [right]
-	fadd dword [vertical_step+16] ; vertical_step[1].x
-	fst dword [right]         ;
+	fld dword [left+0x4]
+	fadd dword [eax+0x4]  ; vertical_step[?].r
+	fst dword [left+0x4]     ;
+	fistp dword [left+0x14]  ; save left.r
+	fld dword [left+0x8]
+	fadd dword [eax+0x8]  ; vertical_step[?].g
+	fst dword [left+0x8]     ;
+	fistp dword [left+0x18]  ; save left.g
+	fld dword [left+0xc]
+	fadd dword [eax+0xc]  ; vertical_step[?].b
+	fst dword [left+0xc]     ;
+	fistp dword [left+0x1c]  ; save left.b
+	fld dword [right+0x0]
+	fadd dword [vertical_step+0x10] ; vertical_step[1].x
+	fst dword [right+0x0]     ;
 	fistp dword [right+0x10]  ; save right.x
-	fld dword [right+4]
-	fadd dword [vertical_step+16+4] ; vertical_step[1].r
-	fst dword [right+4]         ;
-	fistp dword [right+0x10+4]  ; save right.r
-	fld dword [right+8]
-	fadd dword [vertical_step+16+8] ; vertical_step[1].g
-	fst dword [right+8]         ;
-	fistp dword [right+0x10+8]  ; save right.g
-	fld dword [right+12]
-	fadd dword [vertical_step+16+12] ; vertical_step[1].b
-	fst dword [right+12]         ;
-	fistp dword [right+0x10+12]  ; save right.b
+	fld dword [right+0x4]
+	fadd dword [vertical_step+0x14] ; vertical_step[1].r
+	fst dword [right+0x4]     ;
+	fistp dword [right+0x14]  ; save right.r
+	fld dword [right+0x8]
+	fadd dword [vertical_step+0x18] ; vertical_step[1].g
+	fst dword [right+0x8]     ;
+	fistp dword [right+0x18]  ; save right.g
+	fld dword [right+0xc]
+	fadd dword [vertical_step+0x1c] ; vertical_step[1].b
+	fst dword [right+0xc]     ;
+	fistp dword [right+0x1c]  ; save right.b
 
 	jmp draw_triangle_y_loop
 draw_triangle_y_loop_end:
