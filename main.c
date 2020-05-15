@@ -155,7 +155,7 @@ void swap_vertices(VERTEXDATA *a, VERTEXDATA *b)
 
     \param vertex_data Pointer to an array of three VERTEXDATA structures.
  */
-void sort_vertices(VERTEXDATA (*vertex_data)[3])
+void sort_triangle_vertices(VERTEXDATA (*vertex_data)[3])
 {
     if (vertex_data != NULL) {
         if ((*vertex_data)[1].posY < (*vertex_data)[0].posY) {
@@ -175,6 +175,8 @@ void sort_vertices(VERTEXDATA (*vertex_data)[3])
     \param image_data Pointer to the bitmap data.
     \param info_header Pointer to the BITMAPINFOHEADER describing the bitmap.
     \param vertex_data Pointer to the sorted array of three VERTEXDATA structures describing a triangle.
+        The array has to be sorted by vertical position in ascending order.
+    \see sort_triangle_vertices
 
     \return Zero on success, -1 if any argument is a null pointer.
  */
@@ -360,7 +362,7 @@ int main(int argc, char **argv)
                 }
             }
             if (status_ok) {
-                sort_vertices(&vertex_data);
+                sort_triangle_vertices(&vertex_data);
                 if (draw_triangle(image_data, &info_header, &vertex_data) != 0) {
                     puts("Error drawing triangle!");
                 }
