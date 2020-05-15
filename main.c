@@ -253,8 +253,8 @@ int main(int argc, char **argv)
 {
     //check if structures size is correct
     if (sizeof(BITMAPINFOHEADER) != 40 || sizeof(VERTEXDATA) > 12) {
-        fprintf(stderr, "sizeof(struct BITMAPINFOHEADER) = %d (should be 40)", sizeof(BITMAPINFOHEADER));
-        fprintf(stderr, "sizeof(struct VERTEXDATA) = %d (should be 12 at most)", sizeof(VERTEXDATA));
+        fprintf(stderr, "sizeof(struct BITMAPINFOHEADER) = %u (should be 40)\n", sizeof(BITMAPINFOHEADER));
+        fprintf(stderr, "sizeof(struct VERTEXDATA) = %u (should be 12 at most)\n", sizeof(VERTEXDATA));
         fputs("Please use different compiler options in order to meet these criteria!", stderr);
         exit(EXIT_FAILURE);
     }

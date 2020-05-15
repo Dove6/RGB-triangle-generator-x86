@@ -113,7 +113,7 @@ calc_vertical_step0:
     sub eax, [ebx+0xc+0x4]  ; (*vertices)[1].posY
     jz calc_vertical_step1  ; if positions are equal, skip to the next step
     push eax          ;
-    fild dword [esp+0x0+0x0]  ; load y position difference into FPU
+    fild dword [esp]  ; load y position difference into FPU
     ; vertical_step[0].x = ((*vertices)[0].posX - (*vertices)[1].posX) / ((*vertices)[0].posY - (*vertices)[1].posY)
     fild dword [ebx+0x0+0x0]  ; load (*vertices)[0].posX into FPU
     fisub dword [ebx+0xc+0x0]  ; subtract (*vertices)[1].posX

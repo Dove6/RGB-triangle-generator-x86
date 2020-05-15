@@ -18,9 +18,9 @@ all : asm cc link
 asm : 
 	$(ASMBIN) -o rgb_triangle.o -f $(FORMAT) $(ASMFLAGS) -g -l rgb_triangle.lst rgb_triangle.asm
 cc :
-	$(CC) -m32 -c -g -O0 -Wall $(DEFINES) main.c
+	$(CC) -m32 -c -g -O0 $(DEFINES) main.c
 link :
-	$(CC) -m32 -o rgb_triangle$(EXTENSION) rgb_triangle.o main.o
+	$(CC) -m32 -o rgb_triangle$(EXTENSION) rgb_triangle.o main.o -lm
 clean :
 	$(RM) *.o
 	$(RM) rgb_triangle$(EXTENSION)
