@@ -370,14 +370,14 @@ int main(int argc, char **argv)
                 puts("Incorrect vertex format!");
             }
         } else if (strcmp(comparison_buffer, "clear") == 0) {
-            BYTE red = 255, green = 255, blue = 255;
-            if (input_length > 5) {
-                bool status_ok = false;
-                LONG values_read = sscanf(buffer, "clear #%2hhx%2hhx%2hhx",
-                    &red, &green, &blue);
+            //check for non-whitespace characters after the command
+            if (strspn(buffer + 5, " \t\n\v\f\r") + 5 != strlen(buffer)) {
+                BYTE red = 255, green = 255, blue = 255;
+                LONG values_read = sscanf(buffer, "clear #%2hhx%2hhx%2hhx", &red, &green, &blue);
                 if (values_read == 3) {
-                    status_ok = true;
+                    clear_bitmap(image_data, &info_header, red, green, blue);
                 } else {
+                    bool status_ok = false;
                     LONG colors[3];
                     values_read = sscanf(buffer, "clear %d %d %d", &colors[0], &colors[1], &colors[2]);
                     if (values_read == 3) {
@@ -390,19 +390,15 @@ int main(int argc, char **argv)
                         }
                     }
                     if (status_ok) {
-                        red = colors[0];
-                        green = colors[1];
-                        blue = colors[2];
+                        clear_bitmap(image_data, &info_header, colors[0], colors[1], colors[2]);
+                    } else {
+                        puts("Incorrect color format!");
                     }
                 }
-                if (!status_ok) {
-                    puts("Incorrect color format!");
-                    red = 255;
-                    green = 255;
-                    blue = 255;
-                }
+            } else {
+                //no color argument: paint white
+                clear_bitmap(image_data, &info_header, 0xff, 0xff, 0xff);
             }
-            clear_bitmap(image_data, &info_header, red, green, blue);
         } else if (strcmp(comparison_buffer, "save") == 0) {
             char *filename = output_filename;
             char filename_buffer[MAX_PATH];
